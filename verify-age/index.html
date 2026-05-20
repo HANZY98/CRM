@@ -12,42 +12,56 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f5f7;color:#2
 .header{padding:20px 24px;background:#f7f4ff;border-bottom:1px solid #ece8ff}
 h1{margin:0;color:#5b35d5;font-size:28px}
 .content{padding:24px;font-size:16px;line-height:1.7}
-h2{color:#5b35d5;margin-top:0}
-ul{padding-left:22px}
-li{margin:10px 0}
+.btn{
+background:#5b35d5;
+color:white;
+border:none;
+padding:14px 22px;
+border-radius:10px;
+cursor:pointer;
+font-size:16px;
+margin-top:24px;
+}
 </style>
 </head>
 <body>
+
 <div class="wrapper">
-<div class="card">
-<div class="header">
-<h1>Verify Age</h1>
+  <div class="card">
+    <div class="header">
+      <h1>Verify Age</h1>
+    </div>
+
+    <div class="content">
+      <p>Instructions for Verify Age go here.</p>
+
+      <button class="btn" onclick="continueBlueprint()">
+        I understand — continue
+      </button>
+    </div>
+  </div>
 </div>
 
-<div class="content">
+<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 
-<h2>Identity Verification</h2>
+<script>
+ZOHO.embeddedApp.on("PageLoad", function(data) {
+    console.log("Blueprint widget loaded", data);
+});
 
-<p>First check that the applicant has submitted one of the following documents to verify their identity:</p>
+ZOHO.embeddedApp.init();
 
-<ul>
-<li>Passport</li>
-<li>PASS card or CitizenCard</li>
-<li>National Identity Card</li>
-<li>Biometric Residence Permit</li>
-</ul>
+function continueBlueprint() {
+    ZOHO.CRM.BLUEPRINT.proceed()
+    .then(function(response) {
+        console.log("Blueprint proceeded", response);
+    })
+    .catch(function(error) {
+        console.error("Blueprint proceed failed", error);
+        alert("Could not continue transition. Check Blueprint requirements.");
+    });
+}
+</script>
 
-<p>Then check that the applicant’s identification document:</p>
-
-<ul>
-<li>Belongs to the applicant and fully corresponds with their application form</li>
-<li>Check the name, sex, nationality, and age</li>
-<li>Indicates the applicant will be 18 years of age by their preferred starting date</li>
-</ul>
-
-</div>
-
-</div>
-</div>
 </body>
 </html>
