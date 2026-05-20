@@ -7,21 +7,19 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f5f7;color:#202124}
-.wrapper{padding:40px;max-width:900px;margin:auto}
+.wrapper{padding:34px;max-width:940px;margin:auto}
 .card{background:#fff;border-radius:16px;border:1px solid #e5e5ef;box-shadow:0 4px 20px rgba(0,0,0,.05);overflow:hidden}
 .header{padding:20px 24px;background:#f7f4ff;border-bottom:1px solid #ece8ff}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#666;margin-bottom:5px}
 h1{margin:0;color:#5b35d5;font-size:28px}
 .content{padding:24px;font-size:16px;line-height:1.7}
-.btn{
-background:#5b35d5;
-color:white;
-border:none;
-padding:14px 22px;
-border-radius:10px;
-cursor:pointer;
-font-size:16px;
-margin-top:24px;
-}
+h2{color:#5b35d5;margin-top:0}
+ul{padding-left:22px;margin-bottom:18px}
+li{margin:9px 0}
+.actions{padding:0 24px 26px}
+.btn{background:#5b35d5;color:white;border:none;padding:14px 22px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700}
+.btn:hover{filter:brightness(.95)}
+.notice{margin-top:14px;color:#666;font-size:13px}
 </style>
 </head>
 <body>
@@ -29,15 +27,37 @@ margin-top:24px;
 <div class="wrapper">
   <div class="card">
     <div class="header">
+      <div class="eyebrow">Blueprint instructions</div>
       <h1>Verify Disability</h1>
     </div>
 
     <div class="content">
-      <p>Instructions for Verify Disability go here.</p>
+      
+<h2>Disability Verification</h2>
 
+<p>First check that the applicant has submitted one of the following documents to verify a declared disability related to a protected characteristic defined in the Equality Act 2010:</p>
+
+<ul>
+<li>An Education, Health and Care Plan (EHCP) from a local authority.</li>
+<li>A diagnostic assessment report from an educational psychologist, psychiatrist, or specialist assessor.</li>
+<li>Medical evidence or a consultant’s letter issued by the NHS or a private specialist doctor.</li>
+</ul>
+
+<p>Then check that the applicant’s disability-related document:</p>
+
+<ul>
+<li>Belongs to the applicant; i.e. check the name and any other cross-referenceable information.</li>
+<li>Corresponds with the applicant’s declared disability-related protected characteristic.</li>
+<li>If an applicant has a fully validated disability, offer them a Post-Application Assessment with a tutor to verify their capability to use Totara and identify and comprehend their learning objectives.</li>
+</ul>
+
+    </div>
+
+    <div class="actions">
       <button class="btn" onclick="continueBlueprint()">
         I understand — continue
       </button>
+      <div class="notice">This will attempt to proceed with the current Zoho CRM Blueprint transition.</div>
     </div>
   </div>
 </div>
@@ -58,7 +78,7 @@ function continueBlueprint() {
     })
     .catch(function(error) {
         console.error("Blueprint proceed failed", error);
-        alert("Could not continue transition. Check Blueprint requirements.");
+        alert("Could not continue transition. Check any required Blueprint conditions or mandatory fields.");
     });
 }
 </script>

@@ -7,21 +7,19 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f5f7;color:#202124}
-.wrapper{padding:40px;max-width:900px;margin:auto}
+.wrapper{padding:34px;max-width:940px;margin:auto}
 .card{background:#fff;border-radius:16px;border:1px solid #e5e5ef;box-shadow:0 4px 20px rgba(0,0,0,.05);overflow:hidden}
 .header{padding:20px 24px;background:#f7f4ff;border-bottom:1px solid #ece8ff}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#666;margin-bottom:5px}
 h1{margin:0;color:#5b35d5;font-size:28px}
 .content{padding:24px;font-size:16px;line-height:1.7}
-.btn{
-background:#5b35d5;
-color:white;
-border:none;
-padding:14px 22px;
-border-radius:10px;
-cursor:pointer;
-font-size:16px;
-margin-top:24px;
-}
+h2{color:#5b35d5;margin-top:0}
+ul{padding-left:22px;margin-bottom:18px}
+li{margin:9px 0}
+.actions{padding:0 24px 26px}
+.btn{background:#5b35d5;color:white;border:none;padding:14px 22px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700}
+.btn:hover{filter:brightness(.95)}
+.notice{margin-top:14px;color:#666;font-size:13px}
 </style>
 </head>
 <body>
@@ -29,15 +27,29 @@ margin-top:24px;
 <div class="wrapper">
   <div class="card">
     <div class="header">
+      <div class="eyebrow">Blueprint instructions</div>
       <h1>Verify Course Selection</h1>
     </div>
 
     <div class="content">
-      <p>Instructions for Verify Course Selection go here.</p>
+      
+<h2>Course Selection Verification</h2>
 
+<p>Check that the applicant’s course selection:</p>
+
+<ul>
+<li>Meets their needs, or satisfies their requirements.</li>
+<li>Relates to the topics of their education qualifications, or relates to their work history.</li>
+<li>Is only one Further Education Level, Level 3, or Higher Education Level, Level 4 or 5, above their most recent education qualification.</li>
+</ul>
+
+    </div>
+
+    <div class="actions">
       <button class="btn" onclick="continueBlueprint()">
         I understand — continue
       </button>
+      <div class="notice">This will attempt to proceed with the current Zoho CRM Blueprint transition.</div>
     </div>
   </div>
 </div>
@@ -58,7 +70,7 @@ function continueBlueprint() {
     })
     .catch(function(error) {
         console.error("Blueprint proceed failed", error);
-        alert("Could not continue transition. Check Blueprint requirements.");
+        alert("Could not continue transition. Check any required Blueprint conditions or mandatory fields.");
     });
 }
 </script>

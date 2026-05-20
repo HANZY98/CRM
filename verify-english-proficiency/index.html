@@ -7,21 +7,19 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f5f7;color:#202124}
-.wrapper{padding:40px;max-width:900px;margin:auto}
+.wrapper{padding:34px;max-width:940px;margin:auto}
 .card{background:#fff;border-radius:16px;border:1px solid #e5e5ef;box-shadow:0 4px 20px rgba(0,0,0,.05);overflow:hidden}
 .header{padding:20px 24px;background:#f7f4ff;border-bottom:1px solid #ece8ff}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#666;margin-bottom:5px}
 h1{margin:0;color:#5b35d5;font-size:28px}
 .content{padding:24px;font-size:16px;line-height:1.7}
-.btn{
-background:#5b35d5;
-color:white;
-border:none;
-padding:14px 22px;
-border-radius:10px;
-cursor:pointer;
-font-size:16px;
-margin-top:24px;
-}
+h2{color:#5b35d5;margin-top:0}
+ul{padding-left:22px;margin-bottom:18px}
+li{margin:9px 0}
+.actions{padding:0 24px 26px}
+.btn{background:#5b35d5;color:white;border:none;padding:14px 22px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700}
+.btn:hover{filter:brightness(.95)}
+.notice{margin-top:14px;color:#666;font-size:13px}
 </style>
 </head>
 <body>
@@ -29,15 +27,45 @@ margin-top:24px;
 <div class="wrapper">
   <div class="card">
     <div class="header">
+      <div class="eyebrow">Blueprint instructions</div>
       <h1>Verify English Proficiency</h1>
     </div>
 
     <div class="content">
-      <p>Instructions for Verify English Proficiency go here.</p>
+      
+<h2>English Proficiency Verification</h2>
 
+<p>First check that the applicant’s identification document does not state they were born in one of the following English-speaking nations:</p>
+
+<ul>
+<li>United Kingdom.</li>
+<li>Republic of Ireland.</li>
+<li>Any British Constituency or Crown Dependency.</li>
+<li>United States of America.</li>
+<li>Canada.</li>
+<li>Australia.</li>
+<li>New Zealand.</li>
+</ul>
+
+<p>Then check that the applicant’s most recent 2 years of education were not completed in an English-speaking nation by checking the location and date of their most recent education qualification.</p>
+
+<p>Then check that the applicant has submitted one of the following documents to verify their English proficiency:</p>
+
+<ul>
+<li>Common European Framework of Reference (CEFR) B2 certificate.</li>
+<li>IELTS 5.5 certificate, including 5.5 for reading and writing.</li>
+<li>PTE Academic 51 or equivalent certificate.</li>
+</ul>
+
+<p>Finally, check that the applicant’s English proficiency qualification certificate belongs to the applicant; i.e. check the name and any other cross-referenceable information.</p>
+
+    </div>
+
+    <div class="actions">
       <button class="btn" onclick="continueBlueprint()">
         I understand — continue
       </button>
+      <div class="notice">This will attempt to proceed with the current Zoho CRM Blueprint transition.</div>
     </div>
   </div>
 </div>
@@ -58,7 +86,7 @@ function continueBlueprint() {
     })
     .catch(function(error) {
         console.error("Blueprint proceed failed", error);
-        alert("Could not continue transition. Check Blueprint requirements.");
+        alert("Could not continue transition. Check any required Blueprint conditions or mandatory fields.");
     });
 }
 </script>
