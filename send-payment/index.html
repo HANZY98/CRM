@@ -35,7 +35,7 @@ li{margin:9px 0}
       <h2>Payment Setup Steps</h2>
 
       <ul>
-        <li>Go to <a href="https://unicoursepayment.org" target="_blank" rel="noopener noreferrer">unicoursepayment.org</a>.</li>
+        <li>Go to <a id="paymentLink" href="https://unicoursepayment.org" target="_blank" rel="noopener noreferrer">unicoursepayment.org</a> using this link, so the payment is tied to this lead.</li>
         <li>Enter the applicant details, including first name, last name, and email address.</li>
         <li>Select the payment option and choose either BACS or Long Card.</li>
         <li>Select the payment duration, then enter the number of days until the payment plan starts.</li>
@@ -58,6 +58,13 @@ li{margin:9px 0}
 <script>
 ZOHO.embeddedApp.on("PageLoad", function(data) {
     console.log("Blueprint widget loaded", data);
+    // Append the current Lead ID to the payment link so the payment app can
+    // sync status/balances back to this exact CRM record.
+    var leadId = Array.isArray(data.EntityId) ? data.EntityId[0] : data.EntityId;
+    if (leadId) {
+        document.getElementById("paymentLink").href =
+            "https://unicoursepayment.org/?zohoLeadId=" + encodeURIComponent(leadId);
+    }
 });
 
 ZOHO.embeddedApp.init();
