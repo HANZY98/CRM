@@ -36,7 +36,7 @@ li{margin:9px 0}
 
       <ul>
         <li>Go to <a id="paymentLink" href="https://unicoursepayment.org" target="_blank" rel="noopener noreferrer">unicoursepayment.org</a> using this link, so the payment is tied to this lead.</li>
-        <li>Applicant first name, last name, and email will be pre-filled from this lead — check they look right, then continue with the payment details.</li>
+        <li>Applicant first name, last name, and email will be pre-filled from this lead. If the employer is funding the course, employer details will be pre-filled too — check they look right, then continue with the payment details.</li>
         <li>Select the payment option and choose either BACS or Long Card.</li>
         <li>Select the payment duration, then enter the number of days until the payment plan starts.</li>
         <li>Click Generate Link to create the payment link.</li>
@@ -56,19 +56,54 @@ li{margin:9px 0}
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 
 <script>
-function buildPaymentUrl(leadId, firstName, lastName, email) {
+function isTrue(value) {
+    return value === true || value === "true" || value === "True";
+}
+
+function splitName(fullName) {
+    var trimmed = (fullName || "").trim();
+    if (!trimmed) {
+        return { first: "", last: "" };
+    }
+    var space = trimmed.indexOf(" ");
+    if (space === -1) {
+        return { first: trimmed, last: "" };
+    }
+    return {
+        first: trimmed.slice(0, space),
+        last: trimmed.slice(space + 1).trim()
+    };
+}
+
+function buildPaymentUrl(leadId, details) {
+    details = details || {};
     var params = [];
     if (leadId) {
         params.push("zohoLeadId=" + encodeURIComponent(leadId));
     }
-    if (firstName) {
-        params.push("firstName=" + encodeURIComponent(firstName));
+    if (details.firstName) {
+        params.push("firstName=" + encodeURIComponent(details.firstName));
     }
-    if (lastName) {
-        params.push("lastName=" + encodeURIComponent(lastName));
+    if (details.lastName) {
+        params.push("lastName=" + encodeURIComponent(details.lastName));
     }
-    if (email) {
-        params.push("email=" + encodeURIComponent(email));
+    if (details.email) {
+        params.push("email=" + encodeURIComponent(details.email));
+    }
+    if (details.employerPaid) {
+        params.push("employerPaid=true");
+        if (details.employerBusinessName) {
+            params.push("employerBusinessName=" + encodeURIComponent(details.employerBusinessName));
+        }
+        if (details.employerEmail) {
+            params.push("employerEmail=" + encodeURIComponent(details.employerEmail));
+        }
+        if (details.employerReferenceFirstName) {
+            params.push("employerReferenceFirstName=" + encodeURIComponent(details.employerReferenceFirstName));
+        }
+        if (details.employerReferenceLastName) {
+            params.push("employerReferenceLastName=" + encodeURIComponent(details.employerReferenceLastName));
+        }
     }
     return "https://unicoursepayment.org/" + (params.length ? "?" + params.join("&") : "");
 }
@@ -93,12 +128,17 @@ ZOHO.embeddedApp.on("PageLoad", function(data) {
             if (!record) {
                 return;
             }
-            setPaymentLink(buildPaymentUrl(
-                leadId,
-                record.First_Name,
-                record.Last_Name,
-                record.Email
-            ));
+            var employerName = splitName(record.Employer_Name);
+            setPaymentLink(buildPaymentUrl(leadId, {
+                firstName: record.First_Name,
+                lastName: record.Last_Name,
+                email: record.Email,
+                employerPaid: isTrue(record.Will_your_employer_be_funding_you_course_fees),
+                employerBusinessName: record.Company,
+                employerEmail: record.Employer_Email_Address,
+                employerReferenceFirstName: employerName.first,
+                employerReferenceLastName: employerName.last
+            }));
         })
         .catch(function(error) {
             console.error("Unable to load lead details for payment link", error);
