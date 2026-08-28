@@ -35,8 +35,8 @@ li{margin:9px 0}
       <h2>RPL Invoice Process</h2>
 
       <ul>
-        <li>Go to <a href="https://unicoursepayment.org" target="_blank" rel="noopener noreferrer">unicoursepayment.org</a>.</li>
-        <li>Enter the payment details, selecting an upfront payment of £50.</li>
+        <li>Go to <a id="paymentLink" href="https://unicoursepayment.org" target="_blank" rel="noopener noreferrer">unicoursepayment.org</a> using this link, so the payment is tied to this lead.</li>
+        <li>Applicant first name, last name, and email will be pre-filled from this lead. If the employer is funding the course, employer details will be pre-filled too — check they look right, then select an upfront payment of £50.</li>
         <li>Click the Generate Link button to create the payment link.</li>
         <li>Copy the generated link and email it to the applicant.</li>
         <li>Once sent, the invoice process is complete.</li>
@@ -55,8 +55,93 @@ li{margin:9px 0}
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 
 <script>
+function isTrue(value) {
+    return value === true || value === "true" || value === "True";
+}
+
+function splitName(fullName) {
+    var trimmed = (fullName || "").trim();
+    if (!trimmed) {
+        return { first: "", last: "" };
+    }
+    var space = trimmed.indexOf(" ");
+    if (space === -1) {
+        return { first: trimmed, last: "" };
+    }
+    return {
+        first: trimmed.slice(0, space),
+        last: trimmed.slice(space + 1).trim()
+    };
+}
+
+function buildPaymentUrl(leadId, details) {
+    details = details || {};
+    var params = [];
+    if (leadId) {
+        params.push("zohoLeadId=" + encodeURIComponent(leadId));
+    }
+    if (details.firstName) {
+        params.push("firstName=" + encodeURIComponent(details.firstName));
+    }
+    if (details.lastName) {
+        params.push("lastName=" + encodeURIComponent(details.lastName));
+    }
+    if (details.email) {
+        params.push("email=" + encodeURIComponent(details.email));
+    }
+    if (details.employerPaid) {
+        params.push("employerPaid=true");
+        if (details.employerBusinessName) {
+            params.push("employerBusinessName=" + encodeURIComponent(details.employerBusinessName));
+        }
+        if (details.employerEmail) {
+            params.push("employerEmail=" + encodeURIComponent(details.employerEmail));
+        }
+        if (details.employerReferenceFirstName) {
+            params.push("employerReferenceFirstName=" + encodeURIComponent(details.employerReferenceFirstName));
+        }
+        if (details.employerReferenceLastName) {
+            params.push("employerReferenceLastName=" + encodeURIComponent(details.employerReferenceLastName));
+        }
+    }
+    return "https://unicoursepayment.org/" + (params.length ? "?" + params.join("&") : "");
+}
+
+function setPaymentLink(url) {
+    document.getElementById("paymentLink").href = url;
+}
+
 ZOHO.embeddedApp.on("PageLoad", function(data) {
     console.log("Blueprint widget loaded", data);
+    // Pass the current Lead ID plus name/email so the payment form is
+    // pre-filled and can sync status/balances back to this CRM record.
+    var leadId = Array.isArray(data.EntityId) ? data.EntityId[0] : data.EntityId;
+    if (!leadId) {
+        return;
+    }
+    setPaymentLink(buildPaymentUrl(leadId));
+
+    ZOHO.CRM.API.getRecord({ Entity: "Leads", RecordID: leadId })
+        .then(function(response) {
+            var record = response && response.data && response.data[0];
+            if (!record) {
+                return;
+            }
+            var employerName = splitName(record.Employer_Name);
+            setPaymentLink(buildPaymentUrl(leadId, {
+                firstName: record.First_Name,
+                lastName: record.Last_Name,
+                email: record.Email,
+                employerPaid: isTrue(record.Will_your_employer_be_funding_you_course_fees),
+                employerBusinessName: record.Company,
+                employerEmail: record.Employer_Email_Address,
+                employerReferenceFirstName: employerName.first,
+                employerReferenceLastName: employerName.last
+            }));
+        })
+        .catch(function(error) {
+            console.error("Unable to load lead details for payment link", error);
+        });
 });
 
 ZOHO.embeddedApp.init();
