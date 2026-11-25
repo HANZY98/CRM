@@ -2,6 +2,31 @@
   var blueprintRecord = { Entity: null, RecordID: null };
   var cachedWorkflowOrder = null;
   var workflowOrderPromise = null;
+  var blueprintInitPromise = null;
+  var pageLoadHandlers = [];
+
+  if (window.ZOHO && ZOHO.embeddedApp && !ZOHO.embeddedApp.__blueprintPageLoadPatched) {
+    var originalOn = ZOHO.embeddedApp.on.bind(ZOHO.embeddedApp);
+    ZOHO.embeddedApp.__blueprintPageLoadPatched = true;
+    ZOHO.embeddedApp.on = function (event, handler) {
+      if (event !== "PageLoad") {
+        originalOn(event, handler);
+        return;
+      }
+      pageLoadHandlers.push(handler);
+      if (pageLoadHandlers.length === 1) {
+        originalOn("PageLoad", function (data) {
+          pageLoadHandlers.forEach(function (fn) {
+            try {
+              fn(data);
+            } catch (error) {
+              console.error("PageLoad handler failed", error);
+            }
+          });
+        });
+      }
+    };
+  }
 
   function blueprintConfig() {
     return window.BLUEPRINT_CONFIG || {};
@@ -264,15 +289,17 @@
     return String(value);
   }
 
-  function parseRecordFromReferrer() {
-    var ref = document.referrer || "";
+  function parseRecordFromCrmUrl(urlString) {
+    if (!urlString) {
+      return null;
+    }
     var patterns = [
-      /\/tab\/([^/]+)\/(\d{10,})/i,
-      /\/crm\/(?:[^/]+\/){0,3}([^/]+)\/(\d{10,})/i,
+      /\/tab\/([^/?#]+)\/(\d{10,})/i,
+      /\/crm\/(?:[^/?#]+\/){0,5}([^/?#]+)\/(\d{10,})/i,
     ];
 
     for (var i = 0; i < patterns.length; i++) {
-      var match = ref.match(patterns[i]);
+      var match = String(urlString).match(patterns[i]);
       if (match) {
         return {
           Entity: decodeURIComponent(match[1]),
@@ -281,6 +308,88 @@
       }
     }
     return null;
+  }
+
+  function parseRecordFromReferrer() {
+    return parseRecordFromCrmUrl(document.referrer || "");
+  }
+
+  function findRecordIdInObject(value, depth, keyHint) {
+    if (value == null || depth > 6) {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      for (var i = 0; i < value.length; i++) {
+        var fromArray = findRecordIdInObject(value[i], depth + 1, keyHint);
+        if (fromArray) {
+          return fromArray;
+        }
+      }
+      return null;
+    }
+
+    if (typeof value === "object") {
+      for (var key in value) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) {
+          continue;
+        }
+        var nested = value[key];
+        if (/entity.?id|record.?id/i.test(key)) {
+          var id = parseRecordId(nested);
+          if (id) {
+            return id;
+          }
+        }
+        var fromChild = findRecordIdInObject(nested, depth + 1, key);
+        if (fromChild) {
+          return fromChild;
+        }
+      }
+      return null;
+    }
+
+    if (
+      typeof value === "string" &&
+      /^\d{10,20}$/.test(value) &&
+      keyHint &&
+      /entity|record|id/i.test(keyHint)
+    ) {
+      return value;
+    }
+
+    return null;
+  }
+
+  function triggerCrmEvent(payload) {
+    if (typeof self._getAppSDK !== "function") {
+      return Promise.reject(new Error("Zoho SDK is not ready."));
+    }
+    var sdk = self._getAppSDK();
+    payload.sdkVersion = "1.5";
+    return sdk.getContext().Event.Trigger("CRM_EVENT", payload, true);
+  }
+
+  function resolveRecordFromParentUrl() {
+    return triggerCrmEvent({ category: "GET_PARENT_URL" })
+      .then(function (response) {
+        var parentUrl =
+          (response && response.data) ||
+          (response && response.url) ||
+          (typeof response === "string" ? response : "");
+        var parsed = parseRecordFromCrmUrl(parentUrl);
+        if (!parsed) {
+          return null;
+        }
+        blueprintRecord.Entity = blueprintRecord.Entity || parsed.Entity;
+        blueprintRecord.RecordID =
+          blueprintRecord.RecordID || parsed.RecordID;
+        return blueprintRecord;
+      })
+      .catch(function (error) {
+        console.warn("Could not read parent CRM URL", error);
+        return null;
+      });
   }
 
   function parseRecordFromWidgetUrl() {
@@ -365,63 +474,91 @@
       }
     }
 
+    if (!hasRecordContext()) {
+      var discoveredId = findRecordIdInObject(data, 0, "root");
+      if (discoveredId) {
+        blueprintRecord.RecordID = discoveredId;
+        blueprintRecord.Entity =
+          blueprintRecord.Entity ||
+          data.Entity ||
+          blueprintConfig().defaultModule ||
+          "Leads";
+      }
+    }
+
     console.log("Blueprint record context", blueprintRecord, data);
   }
 
+  function ensureSdkInitialized() {
+    if (!blueprintInitPromise) {
+      blueprintInitPromise = ZOHO.embeddedApp.init().then(function () {
+        return resolveRecordFromParentUrl();
+      });
+    }
+    return blueprintInitPromise;
+  }
+
   function ensureRecordContext() {
-    if (hasRecordContext()) {
-      return Promise.resolve(blueprintRecord);
-    }
-
-    if (window.__blueprintPageLoadData) {
-      captureBlueprintPageContext(window.__blueprintPageLoadData);
-    }
-
-    if (hasRecordContext()) {
-      return Promise.resolve(blueprintRecord);
-    }
-
-    var fromReferrer = parseRecordFromReferrer();
-    if (fromReferrer) {
-      blueprintRecord.Entity = fromReferrer.Entity;
-      blueprintRecord.RecordID = fromReferrer.RecordID;
-      return Promise.resolve(blueprintRecord);
-    }
-
-    return new Promise(function (resolve, reject) {
-      var attempts = 0;
-      var maxAttempts = 40;
-      var intervalMs = 250;
-
-      var timer = setInterval(function () {
-        attempts += 1;
+    return ensureSdkInitialized()
+      .then(function () {
+        if (hasRecordContext()) {
+          return blueprintRecord;
+        }
 
         if (window.__blueprintPageLoadData) {
           captureBlueprintPageContext(window.__blueprintPageLoadData);
         }
 
         if (hasRecordContext()) {
-          clearInterval(timer);
-          resolve(blueprintRecord);
-          return;
+          return blueprintRecord;
         }
 
-        if (attempts >= maxAttempts) {
-          clearInterval(timer);
-          reject(new Error("Blueprint record context was not provided by CRM."));
+        var fromReferrer = parseRecordFromReferrer();
+        if (fromReferrer) {
+          blueprintRecord.Entity = fromReferrer.Entity;
+          blueprintRecord.RecordID = fromReferrer.RecordID;
+          return blueprintRecord;
         }
-      }, intervalMs);
-    });
+
+        return new Promise(function (resolve, reject) {
+          var attempts = 0;
+          var maxAttempts = 40;
+          var intervalMs = 250;
+
+          var timer = setInterval(function () {
+            attempts += 1;
+
+            if (window.__blueprintPageLoadData) {
+              captureBlueprintPageContext(window.__blueprintPageLoadData);
+            }
+
+            if (hasRecordContext()) {
+              clearInterval(timer);
+              resolve(blueprintRecord);
+              return;
+            }
+
+            if (attempts >= maxAttempts) {
+              clearInterval(timer);
+              reject(
+                new Error("Blueprint record context was not provided by CRM.")
+              );
+            }
+          }, intervalMs);
+        });
+      })
+      .then(function (record) {
+        if (!hasRecordContext()) {
+          throw new Error("Blueprint record context was not provided by CRM.");
+        }
+        return record || blueprintRecord;
+      });
   }
 
   window.captureBlueprintPageContext = captureBlueprintPageContext;
 
   window.initializeBlueprintWidget = function initializeBlueprintWidget() {
-    if (window.__blueprintWidgetInitDone) {
-      return;
-    }
-    window.__blueprintWidgetInitDone = true;
-    ZOHO.embeddedApp.init();
+    ensureSdkInitialized();
   };
 
   ZOHO.embeddedApp.on("PageLoad", function (data) {
@@ -524,4 +661,25 @@
         );
       });
   };
+
+  window.addEventListener(
+    "message",
+    function (event) {
+      if (!event || !event.data) {
+        return;
+      }
+      var payload = event.data;
+      try {
+        if (typeof payload === "string") {
+          payload = JSON.parse(payload);
+        }
+      } catch (error) {
+        return;
+      }
+      if (payload && payload.data && typeof payload.data === "object") {
+        captureBlueprintPageContext(payload.data);
+      }
+    },
+    false
+  );
 })();
