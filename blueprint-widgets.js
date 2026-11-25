@@ -33,7 +33,25 @@
   }
 
   function normalizeStateName(name) {
-    return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return (name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, " ")
+      .replace(/\s+/g, " ");
+  }
+
+  function compactStateName(name) {
+    return normalizeStateName(name).replace(/\s/g, "");
+  }
+
+  function statesMatch(left, right) {
+    if (!left || !right) {
+      return false;
+    }
+    if (normalizeStateName(left) === normalizeStateName(right)) {
+      return true;
+    }
+    return compactStateName(left) === compactStateName(right);
   }
 
   function workflowOrder() {
@@ -142,6 +160,16 @@
     if (cachedWorkflowOrder && cachedWorkflowOrder.length) {
       return Promise.resolve(cachedWorkflowOrder);
     }
+
+    var configuredOrder =
+      window.BLUEPRINT_WORKFLOW_ORDER &&
+      window.BLUEPRINT_WORKFLOW_ORDER.slice();
+    if (configuredOrder && configuredOrder.length) {
+      cachedWorkflowOrder = configuredOrder;
+      console.log("Using workflow order from workflow-order.js", configuredOrder);
+      return Promise.resolve(configuredOrder);
+    }
+
     if (workflowOrderPromise) {
       return workflowOrderPromise;
     }
@@ -194,9 +222,8 @@
 
   function resolveWorkflowIndex(currentStateName) {
     var order = workflowOrder();
-    var normalizedCurrent = normalizeStateName(currentStateName);
     for (var i = 0; i < order.length; i++) {
-      if (normalizeStateName(order[i]) === normalizedCurrent) {
+      if (statesMatch(order[i], currentStateName)) {
         return i;
       }
     }
@@ -230,7 +257,6 @@
   }
 
   function findTransitionToState(blueprintResponse, targetStateName) {
-    var target = normalizeStateName(targetStateName);
     var transitions = collectTransitions(blueprintResponse);
     var matchByDestination = null;
     var matchByPreviousStateName = null;
@@ -241,7 +267,7 @@
         continue;
       }
 
-      if (normalizeStateName(transition.next_field_value) === target) {
+      if (statesMatch(transition.next_field_value, targetStateName)) {
         matchByDestination = transition;
         break;
       }
