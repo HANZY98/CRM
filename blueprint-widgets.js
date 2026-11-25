@@ -1,7 +1,5 @@
 (function () {
   var blueprintRecord = { Entity: null, RecordID: null };
-  var cachedWorkflowOrder = null;
-  var workflowOrderPromise = null;
   var blueprintInitPromise = null;
   var pageLoadHandlers = [];
 
@@ -29,302 +27,7 @@
   }
 
   function blueprintConfig() {
-    return window.BLUEPRINT_CONFIG || {};
-  }
-
-  function normalizeStateName(name) {
-    return (name || "")
-      .trim()
-      .toLowerCase()
-      .replace(/-/g, " ")
-      .replace(/\s+/g, " ");
-  }
-
-  function compactStateName(name) {
-    return normalizeStateName(name).replace(/\s/g, "");
-  }
-
-  function statesMatch(left, right) {
-    if (!left || !right) {
-      return false;
-    }
-    if (normalizeStateName(left) === normalizeStateName(right)) {
-      return true;
-    }
-    return compactStateName(left) === compactStateName(right);
-  }
-
-  function workflowOrder() {
-    if (cachedWorkflowOrder && cachedWorkflowOrder.length) {
-      return cachedWorkflowOrder.slice();
-    }
-    return (
-      (window.BLUEPRINT_WORKFLOW_ORDER &&
-        window.BLUEPRINT_WORKFLOW_ORDER.slice()) ||
-      []
-    );
-  }
-
-  function parseHttpBody(response) {
-    var body = response;
-    if (response && typeof response === "object" && "response" in response) {
-      body = response.response;
-    }
-    if (typeof body === "string") {
-      try {
-        return JSON.parse(body);
-      } catch (error) {
-        console.warn("Could not parse HTTP response JSON", error);
-        return null;
-      }
-    }
-    return body;
-  }
-
-  function crmHttpGet(pathWithQuery) {
-    return ZOHO.CRM.HTTP.get({
-      url: "https://www.zohoapis.com/crm/v8/" + pathWithQuery,
-    }).then(parseHttpBody);
-  }
-
-  function stateLabel(state) {
-    if (!state) {
-      return "";
-    }
-    if (state.pick_list_value && state.pick_list_value.actual_value) {
-      return state.pick_list_value.actual_value;
-    }
-    if (state.name) {
-      return state.name;
-    }
-    return "";
-  }
-
-  function buildWorkflowOrderFromBlueprintDetail(detail) {
-    var blueprint =
-      (detail &&
-        detail.blueprints &&
-        detail.blueprints[0]) ||
-      detail;
-
-    if (!blueprint) {
-      return [];
-    }
-
-    var nodes =
-      blueprint.chart_data && blueprint.chart_data.nodes
-        ? blueprint.chart_data.nodes.slice()
-        : [];
-
-    if (nodes.length) {
-      nodes.sort(function (a, b) {
-        var xDiff = (a.position_x || 0) - (b.position_x || 0);
-        if (xDiff !== 0) {
-          return xDiff;
-        }
-        return (a.position_y || 0) - (b.position_y || 0);
-      });
-
-      var fromNodes = nodes
-        .map(function (node) {
-          return stateLabel(node.state);
-        })
-        .filter(Boolean);
-
-      if (fromNodes.length) {
-        return fromNodes;
-      }
-    }
-
-    var states = blueprint.states || [];
-    return states
-      .map(function (state) {
-        return stateLabel(state);
-      })
-      .filter(Boolean);
-  }
-
-  function findBlueprintSummary(listResponse, processName) {
-    var blueprints = (listResponse && listResponse.blueprints) || [];
-    var target = normalizeStateName(processName);
-
-    for (var i = 0; i < blueprints.length; i++) {
-      if (normalizeStateName(blueprints[i].name) === target) {
-        return blueprints[i];
-      }
-    }
-    return null;
-  }
-
-  function ensureWorkflowOrder(moduleApiName, processName) {
-    if (cachedWorkflowOrder && cachedWorkflowOrder.length) {
-      return Promise.resolve(cachedWorkflowOrder);
-    }
-
-    var configuredOrder =
-      window.BLUEPRINT_WORKFLOW_ORDER &&
-      window.BLUEPRINT_WORKFLOW_ORDER.slice();
-    if (configuredOrder && configuredOrder.length) {
-      cachedWorkflowOrder = configuredOrder;
-      console.log("Using workflow order from workflow-order.js", configuredOrder);
-      return Promise.resolve(configuredOrder);
-    }
-
-    if (workflowOrderPromise) {
-      return workflowOrderPromise;
-    }
-
-    var module = moduleApiName || "Leads";
-    var lookupName =
-      processName ||
-      blueprintConfig().processName ||
-      "Admissions New";
-
-    workflowOrderPromise = crmHttpGet(
-      "settings/blueprints?module=" +
-        encodeURIComponent(module) +
-        "&status=Active"
-    )
-      .then(function (listResponse) {
-        var summary = findBlueprintSummary(listResponse, lookupName);
-        if (!summary || !summary.id) {
-          throw new Error('Blueprint "' + lookupName + '" was not found.');
-        }
-        return crmHttpGet(
-          "settings/blueprints/" +
-            encodeURIComponent(summary.id) +
-            "?include=state,transition"
-        );
-      })
-      .then(function (detailResponse) {
-        var order = buildWorkflowOrderFromBlueprintDetail(detailResponse);
-        if (!order.length) {
-          throw new Error("Blueprint has no readable states.");
-        }
-        cachedWorkflowOrder = order;
-        console.log("Loaded workflow order from Zoho:", order);
-        return order;
-      })
-      .catch(function (error) {
-        console.warn(
-          "Using fallback workflow-order.js list:",
-          error && error.message ? error.message : error
-        );
-        cachedWorkflowOrder = workflowOrder();
-        return cachedWorkflowOrder;
-      })
-      .finally(function () {
-        workflowOrderPromise = null;
-      });
-
-    return workflowOrderPromise;
-  }
-
-  function resolveWorkflowIndex(currentStateName) {
-    var order = workflowOrder();
-    for (var i = 0; i < order.length; i++) {
-      if (statesMatch(order[i], currentStateName)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  function getPreviousStateName(currentStateName) {
-    var index = resolveWorkflowIndex(currentStateName);
-    if (index <= 0) {
-      return null;
-    }
-    return workflowOrder()[index - 1];
-  }
-
-  function collectTransitions(blueprintResponse) {
-    var collected = [];
-    var transitions =
-      (blueprintResponse &&
-        blueprintResponse.blueprint &&
-        blueprintResponse.blueprint.transitions) ||
-      [];
-
-    transitions.forEach(function (transition) {
-      collected.push(transition);
-      (transition.next_transitions || []).forEach(function (child) {
-        collected.push(child);
-      });
-    });
-
-    return collected;
-  }
-
-  function findTransitionToState(blueprintResponse, targetStateName) {
-    var transitions = collectTransitions(blueprintResponse);
-    var matchByDestination = null;
-    var matchByTransitionName = null;
-    var matchByPreviousStateName = null;
-    var backNamePatterns = ["previous state", "go back", "back", "step back"];
-
-    for (var i = 0; i < transitions.length; i++) {
-      var transition = transitions[i];
-      if (!transition || !transition.id) {
-        continue;
-      }
-
-      if (statesMatch(transition.next_field_value, targetStateName)) {
-        matchByDestination = transition;
-        break;
-      }
-
-      if (!matchByTransitionName && statesMatch(transition.name, targetStateName)) {
-        matchByTransitionName = transition;
-      }
-
-      var transitionName = normalizeStateName(transition.name);
-      for (var p = 0; p < backNamePatterns.length; p++) {
-        if (
-          transitionName === backNamePatterns[p] ||
-          transitionName.indexOf(backNamePatterns[p]) !== -1
-        ) {
-          if (!matchByPreviousStateName) {
-            matchByPreviousStateName = transition;
-          }
-        }
-      }
-    }
-
-    return (
-      matchByDestination || matchByTransitionName || matchByPreviousStateName
-    );
-  }
-
-  function describeTransitions(blueprintResponse) {
-    return collectTransitions(blueprintResponse)
-      .map(function (t) {
-        var parts = [];
-        if (t.name) {
-          parts.push('"' + t.name + '"');
-        }
-        if (t.next_field_value) {
-          parts.push("→ " + t.next_field_value);
-        }
-        return parts.join(" ");
-      })
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  function runBlueprintTransition(transitionId) {
-    return ZOHO.CRM.API.updateBluePrint({
-      Entity: blueprintRecord.Entity,
-      RecordID: blueprintRecord.RecordID,
-      BlueprintData: {
-        blueprint: [
-          {
-            transition_id: transitionId,
-            data: {},
-          },
-        ],
-      },
-    });
+    return window.BLUEPRINT_CONFIG || { defaultModule: "Leads" };
   }
 
   function hasRecordContext() {
@@ -365,18 +68,14 @@
     return null;
   }
 
-  function parseRecordFromReferrer() {
-    return parseRecordFromCrmUrl(document.referrer || "");
-  }
-
-  function findRecordIdInObject(value, depth, keyHint) {
+  function findRecordIdInObject(value, depth) {
     if (value == null || depth > 6) {
       return null;
     }
 
     if (Array.isArray(value)) {
       for (var i = 0; i < value.length; i++) {
-        var fromArray = findRecordIdInObject(value[i], depth + 1, keyHint);
+        var fromArray = findRecordIdInObject(value[i], depth + 1);
         if (fromArray) {
           return fromArray;
         }
@@ -389,28 +88,17 @@
         if (!Object.prototype.hasOwnProperty.call(value, key)) {
           continue;
         }
-        var nested = value[key];
         if (/entity.?id|record.?id/i.test(key)) {
-          var id = parseRecordId(nested);
+          var id = parseRecordId(value[key]);
           if (id) {
             return id;
           }
         }
-        var fromChild = findRecordIdInObject(nested, depth + 1, key);
+        var fromChild = findRecordIdInObject(value[key], depth + 1);
         if (fromChild) {
           return fromChild;
         }
       }
-      return null;
-    }
-
-    if (
-      typeof value === "string" &&
-      /^\d{10,20}$/.test(value) &&
-      keyHint &&
-      /entity|record|id/i.test(keyHint)
-    ) {
-      return value;
     }
 
     return null;
@@ -445,34 +133,6 @@
         console.warn("Could not read parent CRM URL", error);
         return null;
       });
-  }
-
-  function parseRecordFromWidgetUrl() {
-    var search = window.location.search || "";
-    if (!search) {
-      return null;
-    }
-
-    var params = new URLSearchParams(search);
-    var recordId =
-      params.get("recordId") ||
-      params.get("recordID") ||
-      params.get("EntityId") ||
-      params.get("entityId") ||
-      params.get("id");
-    var entity =
-      params.get("Entity") ||
-      params.get("module") ||
-      params.get("entity") ||
-      blueprintConfig().defaultModule ||
-      "Leads";
-
-    recordId = parseRecordId(recordId);
-    if (!recordId) {
-      return null;
-    }
-
-    return { Entity: entity, RecordID: recordId };
   }
 
   function captureBlueprintPageContext(data) {
@@ -512,7 +172,7 @@
     }
 
     if (!hasRecordContext()) {
-      var fromReferrer = parseRecordFromReferrer();
+      var fromReferrer = parseRecordFromCrmUrl(document.referrer || "");
       if (fromReferrer) {
         blueprintRecord.Entity = blueprintRecord.Entity || fromReferrer.Entity;
         blueprintRecord.RecordID =
@@ -521,23 +181,11 @@
     }
 
     if (!hasRecordContext()) {
-      var fromUrl = parseRecordFromWidgetUrl();
-      if (fromUrl) {
-        blueprintRecord.Entity = blueprintRecord.Entity || fromUrl.Entity;
-        blueprintRecord.RecordID =
-          blueprintRecord.RecordID || fromUrl.RecordID;
-      }
-    }
-
-    if (!hasRecordContext()) {
-      var discoveredId = findRecordIdInObject(data, 0, "root");
+      var discoveredId = findRecordIdInObject(data, 0);
       if (discoveredId) {
         blueprintRecord.RecordID = discoveredId;
         blueprintRecord.Entity =
-          blueprintRecord.Entity ||
-          data.Entity ||
-          blueprintConfig().defaultModule ||
-          "Leads";
+          blueprintRecord.Entity || blueprintConfig().defaultModule || "Leads";
       }
     }
 
@@ -553,64 +201,10 @@
     return blueprintInitPromise;
   }
 
-  function ensureRecordContext() {
-    return ensureSdkInitialized()
-      .then(function () {
-        if (hasRecordContext()) {
-          return blueprintRecord;
-        }
-
-        if (window.__blueprintPageLoadData) {
-          captureBlueprintPageContext(window.__blueprintPageLoadData);
-        }
-
-        if (hasRecordContext()) {
-          return blueprintRecord;
-        }
-
-        var fromReferrer = parseRecordFromReferrer();
-        if (fromReferrer) {
-          blueprintRecord.Entity = fromReferrer.Entity;
-          blueprintRecord.RecordID = fromReferrer.RecordID;
-          return blueprintRecord;
-        }
-
-        return new Promise(function (resolve, reject) {
-          var attempts = 0;
-          var maxAttempts = 40;
-          var intervalMs = 250;
-
-          var timer = setInterval(function () {
-            attempts += 1;
-
-            if (window.__blueprintPageLoadData) {
-              captureBlueprintPageContext(window.__blueprintPageLoadData);
-            }
-
-            if (hasRecordContext()) {
-              clearInterval(timer);
-              resolve(blueprintRecord);
-              return;
-            }
-
-            if (attempts >= maxAttempts) {
-              clearInterval(timer);
-              reject(
-                new Error("Blueprint record context was not provided by CRM.")
-              );
-            }
-          }, intervalMs);
-        });
-      })
-      .then(function (record) {
-        if (!hasRecordContext()) {
-          throw new Error("Blueprint record context was not provided by CRM.");
-        }
-        return record || blueprintRecord;
-      });
-  }
-
   window.captureBlueprintPageContext = captureBlueprintPageContext;
+  window.getBlueprintRecordContext = function () {
+    return blueprintRecord;
+  };
 
   window.initializeBlueprintWidget = function initializeBlueprintWidget() {
     ensureSdkInitialized();
@@ -619,120 +213,4 @@
   ZOHO.embeddedApp.on("PageLoad", function (data) {
     captureBlueprintPageContext(data);
   });
-
-  window.previousBlueprintState = function previousBlueprintState() {
-    ensureRecordContext()
-      .catch(function () {
-        alert(
-          "This page is not linked to a CRM record yet. Open it from a Blueprint transition on a lead."
-        );
-        return null;
-      })
-      .then(function (context) {
-        if (!context) {
-          return null;
-        }
-
-        return ZOHO.CRM.API.getBluePrint({
-          Entity: blueprintRecord.Entity,
-          RecordID: blueprintRecord.RecordID,
-        });
-      })
-      .then(function (blueprintResponse) {
-        if (!blueprintResponse) {
-          return null;
-        }
-
-        var processInfo =
-          blueprintResponse &&
-          blueprintResponse.blueprint &&
-          blueprintResponse.blueprint.process_info;
-        var currentState = (processInfo && processInfo.field_value) || "";
-        var processName =
-          (processInfo && processInfo.name) ||
-          blueprintConfig().processName ||
-          "Admissions New";
-
-        if (!currentState) {
-          alert("Could not read the current Blueprint stage for this record.");
-          return null;
-        }
-
-        return ensureWorkflowOrder(blueprintRecord.Entity, processName).then(
-          function () {
-            var previousState = getPreviousStateName(currentState);
-            if (!previousState) {
-              if (resolveWorkflowIndex(currentState) === -1) {
-                alert(
-                  'Current stage "' +
-                    currentState +
-                    '" was not found in the Admissions New workflow order.'
-                );
-              } else {
-                alert("This record is already on the first stage in the process.");
-              }
-              return null;
-            }
-
-            var transition = findTransitionToState(
-              blueprintResponse,
-              previousState
-            );
-            if (!transition) {
-              var transitionDetails =
-                describeTransitions(blueprintResponse) || "none";
-
-              alert(
-                '"' +
-                  previousState +
-                  '" is a valid stage in Admissions New, but this record has no Blueprint button that moves back to it from "' +
-                  currentState +
-                  '".\n\nIn Zoho Blueprint, open Admissions New and draw a transition:\n' +
-                  currentState +
-                  " → " +
-                  previousState +
-                  '\n(Button name can be anything, e.g. "Previous state".)\n\nTransitions Zoho is offering right now:\n' +
-                  transitionDetails
-              );
-              return null;
-            }
-
-            return runBlueprintTransition(transition.id);
-          }
-        );
-      })
-      .then(function (response) {
-        if (!response) {
-          return;
-        }
-        console.log("Moved one Blueprint stage back", response);
-      })
-      .catch(function (error) {
-        console.error("Previous state transition failed", error);
-        alert(
-          "Could not move one stage back. Check the back transition in Blueprint and any required fields."
-        );
-      });
-  };
-
-  window.addEventListener(
-    "message",
-    function (event) {
-      if (!event || !event.data) {
-        return;
-      }
-      var payload = event.data;
-      try {
-        if (typeof payload === "string") {
-          payload = JSON.parse(payload);
-        }
-      } catch (error) {
-        return;
-      }
-      if (payload && payload.data && typeof payload.data === "object") {
-        captureBlueprintPageContext(payload.data);
-      }
-    },
-    false
-  );
 })();
