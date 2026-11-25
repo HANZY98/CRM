@@ -5,6 +5,7 @@
  */
 window.BLUEPRINT_CONFIG = {
   processName: "Admissions New",
+  defaultModule: "Leads",
 };
 
 window.BLUEPRINT_WORKFLOW_ORDER = [

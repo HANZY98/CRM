@@ -68,10 +68,11 @@ li{margin:9px 0}
 
 <script>
 ZOHO.embeddedApp.on("PageLoad", function(data) {
+    captureBlueprintPageContext(data);
     console.log("Blueprint widget loaded", data);
 });
 
-ZOHO.embeddedApp.init();
+initializeBlueprintWidget();
 
 function continueBlueprint() {
     ZOHO.CRM.BLUEPRINT.proceed()

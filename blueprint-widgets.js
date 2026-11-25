@@ -247,24 +247,210 @@
     });
   }
 
-  ZOHO.embeddedApp.on("PageLoad", function (data) {
-    blueprintRecord.Entity = data.Entity;
-    blueprintRecord.RecordID = data.EntityId;
-  });
+  function hasRecordContext() {
+    return !!(blueprintRecord.Entity && blueprintRecord.RecordID);
+  }
 
-  window.previousBlueprintState = function previousBlueprintState() {
-    if (!blueprintRecord.Entity || !blueprintRecord.RecordID) {
-      alert(
-        "This page is not linked to a CRM record yet. Open it from a Blueprint transition."
-      );
+  function parseRecordId(value) {
+    if (value == null || value === "") {
+      return "";
+    }
+    if (Array.isArray(value)) {
+      return parseRecordId(value[0]);
+    }
+    if (typeof value === "object" && value.id != null) {
+      return String(value.id);
+    }
+    return String(value);
+  }
+
+  function parseRecordFromReferrer() {
+    var ref = document.referrer || "";
+    var patterns = [
+      /\/tab\/([^/]+)\/(\d{10,})/i,
+      /\/crm\/(?:[^/]+\/){0,3}([^/]+)\/(\d{10,})/i,
+    ];
+
+    for (var i = 0; i < patterns.length; i++) {
+      var match = ref.match(patterns[i]);
+      if (match) {
+        return {
+          Entity: decodeURIComponent(match[1]),
+          RecordID: match[2],
+        };
+      }
+    }
+    return null;
+  }
+
+  function parseRecordFromWidgetUrl() {
+    var search = window.location.search || "";
+    if (!search) {
+      return null;
+    }
+
+    var params = new URLSearchParams(search);
+    var recordId =
+      params.get("recordId") ||
+      params.get("recordID") ||
+      params.get("EntityId") ||
+      params.get("entityId") ||
+      params.get("id");
+    var entity =
+      params.get("Entity") ||
+      params.get("module") ||
+      params.get("entity") ||
+      blueprintConfig().defaultModule ||
+      "Leads";
+
+    recordId = parseRecordId(recordId);
+    if (!recordId) {
+      return null;
+    }
+
+    return { Entity: entity, RecordID: recordId };
+  }
+
+  function captureBlueprintPageContext(data) {
+    if (!data || typeof data !== "object") {
       return;
     }
 
-    ZOHO.CRM.API.getBluePrint({
-      Entity: blueprintRecord.Entity,
-      RecordID: blueprintRecord.RecordID,
-    })
+    window.__blueprintPageLoadData = data;
+
+    var entity =
+      data.Entity ||
+      data.entity ||
+      data.Module ||
+      data.module ||
+      data.EntityName;
+    var recordId =
+      data.EntityId ||
+      data.EntityID ||
+      data.entityId ||
+      data.RecordID ||
+      data.RecordId ||
+      data.record_id ||
+      data.recordId ||
+      data.id;
+
+    recordId = parseRecordId(recordId);
+
+    if (!entity && blueprintConfig().defaultModule) {
+      entity = blueprintConfig().defaultModule;
+    }
+
+    if (entity) {
+      blueprintRecord.Entity = entity;
+    }
+    if (recordId) {
+      blueprintRecord.RecordID = recordId;
+    }
+
+    if (!hasRecordContext()) {
+      var fromReferrer = parseRecordFromReferrer();
+      if (fromReferrer) {
+        blueprintRecord.Entity = blueprintRecord.Entity || fromReferrer.Entity;
+        blueprintRecord.RecordID =
+          blueprintRecord.RecordID || fromReferrer.RecordID;
+      }
+    }
+
+    if (!hasRecordContext()) {
+      var fromUrl = parseRecordFromWidgetUrl();
+      if (fromUrl) {
+        blueprintRecord.Entity = blueprintRecord.Entity || fromUrl.Entity;
+        blueprintRecord.RecordID =
+          blueprintRecord.RecordID || fromUrl.RecordID;
+      }
+    }
+
+    console.log("Blueprint record context", blueprintRecord, data);
+  }
+
+  function ensureRecordContext() {
+    if (hasRecordContext()) {
+      return Promise.resolve(blueprintRecord);
+    }
+
+    if (window.__blueprintPageLoadData) {
+      captureBlueprintPageContext(window.__blueprintPageLoadData);
+    }
+
+    if (hasRecordContext()) {
+      return Promise.resolve(blueprintRecord);
+    }
+
+    var fromReferrer = parseRecordFromReferrer();
+    if (fromReferrer) {
+      blueprintRecord.Entity = fromReferrer.Entity;
+      blueprintRecord.RecordID = fromReferrer.RecordID;
+      return Promise.resolve(blueprintRecord);
+    }
+
+    return new Promise(function (resolve, reject) {
+      var attempts = 0;
+      var maxAttempts = 40;
+      var intervalMs = 250;
+
+      var timer = setInterval(function () {
+        attempts += 1;
+
+        if (window.__blueprintPageLoadData) {
+          captureBlueprintPageContext(window.__blueprintPageLoadData);
+        }
+
+        if (hasRecordContext()) {
+          clearInterval(timer);
+          resolve(blueprintRecord);
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(timer);
+          reject(new Error("Blueprint record context was not provided by CRM."));
+        }
+      }, intervalMs);
+    });
+  }
+
+  window.captureBlueprintPageContext = captureBlueprintPageContext;
+
+  window.initializeBlueprintWidget = function initializeBlueprintWidget() {
+    if (window.__blueprintWidgetInitDone) {
+      return;
+    }
+    window.__blueprintWidgetInitDone = true;
+    ZOHO.embeddedApp.init();
+  };
+
+  ZOHO.embeddedApp.on("PageLoad", function (data) {
+    captureBlueprintPageContext(data);
+  });
+
+  window.previousBlueprintState = function previousBlueprintState() {
+    ensureRecordContext()
+      .catch(function () {
+        alert(
+          "This page is not linked to a CRM record yet. Open it from a Blueprint transition on a lead."
+        );
+        return null;
+      })
+      .then(function (context) {
+        if (!context) {
+          return null;
+        }
+
+        return ZOHO.CRM.API.getBluePrint({
+          Entity: blueprintRecord.Entity,
+          RecordID: blueprintRecord.RecordID,
+        });
+      })
       .then(function (blueprintResponse) {
+        if (!blueprintResponse) {
+          return null;
+        }
+
         var processInfo =
           blueprintResponse &&
           blueprintResponse.blueprint &&

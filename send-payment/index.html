@@ -123,6 +123,7 @@ function setPaymentLink(url) {
 }
 
 ZOHO.embeddedApp.on("PageLoad", function(data) {
+    captureBlueprintPageContext(data);
     console.log("Blueprint widget loaded", data);
     // Pass the current Lead ID plus name/email so the payment form is
     // pre-filled and can sync status/balances back to this CRM record.
@@ -155,7 +156,7 @@ ZOHO.embeddedApp.on("PageLoad", function(data) {
         });
 });
 
-ZOHO.embeddedApp.init();
+initializeBlueprintWidget();
 
 function continueBlueprint() {
     ZOHO.CRM.BLUEPRINT.proceed()
