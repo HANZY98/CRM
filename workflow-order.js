@@ -1,11 +1,14 @@
 /**
- * Stage names must match Zoho Blueprint picklist values exactly
- * (process_info.field_value from getBluePrint).
- *
- * Reorder this list to match your live process. Branches (e.g. Reject)
- * can be omitted if you do not need one-step back from them.
+ * Optional fallback if the widget cannot load blueprint settings from Zoho.
+ * On a real record, the widget prefers process_info.name (e.g. "Admissions New")
+ * and loads stage order from the Blueprint API automatically.
  */
+window.BLUEPRINT_CONFIG = {
+  processName: "Admissions New",
+};
+
 window.BLUEPRINT_WORKFLOW_ORDER = [
+  "Admissions New",
   "Verify Age",
   "Verify Residency",
   "Verify Applicant Declarations",

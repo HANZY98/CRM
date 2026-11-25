@@ -14,16 +14,20 @@ Each page includes:
 
 ## One-step back (best setup)
 
-Zoho has no `setState()` in widgets. The record only moves when a **Blueprint transition** runs. This project does the next best thing:
+Zoho has no `setState()` in widgets. The record only moves when a **Blueprint transition** runs.
 
-1. **`workflow-order.js`** — ordered list of stage names (must match Zoho picklist values exactly).
-2. **Widget** — reads current stage from `getBluePrint` → finds the previous name in that list → runs whichever transition’s destination is that previous stage.
-3. **Zoho Blueprint** — on every stage except the first, add **one back transition** to the previous stage. The transition **name does not matter**; the destination stage does.
+When **Previous state** is clicked, the widget:
+
+1. Reads the record’s blueprint (`getBluePrint`), including process name (e.g. **Admissions New**).
+2. Loads that blueprint’s stages from Zoho (`settings/blueprints` API) and orders them from the blueprint canvas layout.
+3. Finds the previous stage in that order and runs a transition whose destination matches it.
+
+`workflow-order.js` is only a **fallback** if settings API access is blocked. Set `BLUEPRINT_CONFIG.processName` to **Admissions New**.
 
 ### Zoho checklist
 
-- [ ] Copy stage names from Blueprint into `workflow-order.js` in process order.
-- [ ] For each stage (from the 2nd onward), add a transition **to the previous stage** in the list.
-- [ ] Publish the updated GitHub Pages files and test on a record in the middle of the flow.
+- [ ] Widget users need permission to use CRM HTTP / blueprint settings (Developer Permissions profile).
+- [ ] For each stage (from the 2nd onward), add a **back transition** to the previous stage in the process.
+- [ ] Test **Previous state** on a record in the middle of the flow.
 
 Forward is unchanged: **continue** uses the transition you opened the widget from (`proceed()`).
