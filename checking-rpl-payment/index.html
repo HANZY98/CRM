@@ -19,6 +19,9 @@ li{margin:9px 0}
 .actions{padding:0 24px 26px}
 .btn{background:#5b35d5;color:white;border:none;padding:14px 22px;border-radius:10px;cursor:pointer;font-size:16px;font-weight:700}
 .btn:hover{filter:brightness(.95)}
+.actions-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn-previous{background:#c5221f}
+.btn-previous:hover{filter:brightness(.95)}
 .notice{margin-top:14px;color:#666;font-size:13px}
 </style>
 </head>
@@ -43,15 +46,22 @@ li{margin:9px 0}
     </div>
 
     <div class="actions">
-      <button class="btn" onclick="continueBlueprint()">
-        I understand — continue
-      </button>
+      <div class="actions-row">
+        <button type="button" class="btn btn-previous" onclick="previousBlueprintState()">
+          Previous state
+        </button>
+        <button type="button" class="btn" onclick="continueBlueprint()">
+          I understand — continue
+        </button>
+      </div>
       <div class="notice">This will attempt to proceed with the current Zoho CRM Blueprint transition.</div>
     </div>
   </div>
 </div>
 
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+<script src="../workflow-order.js"></script>
+<script src="../blueprint-widgets.js"></script>
 
 <script>
 ZOHO.embeddedApp.on("PageLoad", function(data) {
