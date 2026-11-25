@@ -1,7 +1,6 @@
 /**
  * Admissions New — Zoho Blueprint stage names (picklist values).
- * Fallback when settings API is unavailable. Order follows the main path
- * left-to-right through the blueprint (branches included where they sit).
+ * Names use the same spacing as in CRM (not compressed like the blueprint canvas export).
  */
 window.BLUEPRINT_CONFIG = {
   processName: "Admissions New",
@@ -9,27 +8,27 @@ window.BLUEPRINT_CONFIG = {
 };
 
 window.BLUEPRINT_WORKFLOW_ORDER = [
-  "Applied- StartedCheck",
-  "VerifyingResidency",
+  "Applied - Started Check",
+  "Verifying Residency",
   "Verify Documents",
   "Pass Criminality",
   "Verify English Proficiency",
-  "VerifyingBackgroundEducation",
-  "VerifyingWorkExperience",
-  "VerifyingCourse Motivation",
-  "VerifyingCourse Selection",
+  "Verifying Background Education",
+  "Verifying Work Experience",
+  "Verifying Course Motivation",
+  "Verifying Course Selection",
   "Change Course",
   "Post Assessment",
-  "VerifyingApplicantDeclaration",
-  "CheckRPL is needed",
-  "InvoicingRPL",
-  "EducationRPL Review",
-  "InvoiceNeeded",
-  "WaitingOnApplicantToPay",
-  "Preparing EnrolmentContract",
+  "Verifying Applicant Declaration",
+  "Check RPL is needed",
+  "Invoicing RPL",
+  "Education RPL Review",
+  "Invoice Needed",
+  "Waiting On Applicant To Pay",
+  "Preparing Enrolment Contract",
   "Pending Applicant To Sign",
   "Totara Setting Up",
-  "EnrolledFinished AdmissionsProcess",
-  "ApplicantRejected",
-  "ApplicantRestarted",
+  "Enrolled Finished Admissions Process",
+  "Applicant Rejected",
+  "Applicant Restarted",
 ];
