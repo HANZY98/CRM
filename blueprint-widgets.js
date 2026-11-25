@@ -259,7 +259,9 @@
   function findTransitionToState(blueprintResponse, targetStateName) {
     var transitions = collectTransitions(blueprintResponse);
     var matchByDestination = null;
+    var matchByTransitionName = null;
     var matchByPreviousStateName = null;
+    var backNamePatterns = ["previous state", "go back", "back", "step back"];
 
     for (var i = 0; i < transitions.length; i++) {
       var transition = transitions[i];
@@ -272,15 +274,42 @@
         break;
       }
 
-      if (
-        normalizeStateName(transition.name) === "previous state" &&
-        !matchByPreviousStateName
-      ) {
-        matchByPreviousStateName = transition;
+      if (!matchByTransitionName && statesMatch(transition.name, targetStateName)) {
+        matchByTransitionName = transition;
+      }
+
+      var transitionName = normalizeStateName(transition.name);
+      for (var p = 0; p < backNamePatterns.length; p++) {
+        if (
+          transitionName === backNamePatterns[p] ||
+          transitionName.indexOf(backNamePatterns[p]) !== -1
+        ) {
+          if (!matchByPreviousStateName) {
+            matchByPreviousStateName = transition;
+          }
+        }
       }
     }
 
-    return matchByDestination || matchByPreviousStateName;
+    return (
+      matchByDestination || matchByTransitionName || matchByPreviousStateName
+    );
+  }
+
+  function describeTransitions(blueprintResponse) {
+    return collectTransitions(blueprintResponse)
+      .map(function (t) {
+        var parts = [];
+        if (t.name) {
+          parts.push('"' + t.name + '"');
+        }
+        if (t.next_field_value) {
+          parts.push("→ " + t.next_field_value);
+        }
+        return parts.join(" ");
+      })
+      .filter(Boolean)
+      .join("\n");
   }
 
   function runBlueprintTransition(transitionId) {
@@ -650,22 +679,20 @@
               previousState
             );
             if (!transition) {
-              var destinations = collectTransitions(blueprintResponse)
-                .map(function (t) {
-                  return t.next_field_value || t.name;
-                })
-                .filter(Boolean)
-                .join(", ");
+              var transitionDetails =
+                describeTransitions(blueprintResponse) || "none";
 
               alert(
-                'No transition to "' +
+                '"' +
                   previousState +
-                  '" is available from "' +
+                  '" is a valid stage in Admissions New, but this record has no Blueprint button that moves back to it from "' +
                   currentState +
-                  '".\n\nAdd a back transition in Blueprint to "' +
+                  '".\n\nIn Zoho Blueprint, open Admissions New and draw a transition:\n' +
+                  currentState +
+                  " → " +
                   previousState +
-                  '".\n\nTransitions available now: ' +
-                  (destinations || "none")
+                  '\n(Button name can be anything, e.g. "Previous state".)\n\nTransitions Zoho is offering right now:\n' +
+                  transitionDetails
               );
               return null;
             }

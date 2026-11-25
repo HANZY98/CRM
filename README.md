@@ -27,7 +27,7 @@ When **Previous state** is clicked, the widget:
 ### Zoho checklist
 
 - [ ] Widget users need permission to use CRM HTTP / blueprint settings (Developer Permissions profile).
-- [ ] For each stage (from the 2nd onward), add a **back transition** to the previous stage in the process.
+- [ ] For each stage (from the 2nd onward), add a **back transition arrow** in Blueprint to the previous stage (e.g. `Pending Applicant To Sign` → `Preparing Enrolment Contract`). The stage can exist in the process, but the widget can only use a **transition button** Zoho exposes on that record.
 - [ ] Test **Previous state** on a record in the middle of the flow.
 
 Forward is unchanged: **continue** uses the transition you opened the widget from (`proceed()`).
